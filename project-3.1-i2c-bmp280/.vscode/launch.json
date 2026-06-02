@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug STM32",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "openocd",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/awc-pwm-timer.elf",
+            "configFiles": [
+                "board/stm32f4discovery.cfg"
+            ],
+            "gdbPath": "gdb-multiarch",
+            "device": "STM32F407VG",
+            "svdFile": "",
+            "runToEntryPoint": "main"
+        }
+    ]
+}

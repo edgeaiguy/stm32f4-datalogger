@@ -1,5 +1,5 @@
 # Project name
-TARGET = awc-pwm-timer
+TARGET = i2c-bmp280
 
 # Toolchain
 CC = arm-none-eabi-gcc

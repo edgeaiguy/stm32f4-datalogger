@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include "stm32f407xx.h"
+#include "uart2.h"
 
 /* enable UART2 clocks and configure pins */
 void uart2_init(void) {

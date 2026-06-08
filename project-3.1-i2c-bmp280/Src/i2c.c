@@ -77,3 +77,29 @@ int i2c_send_address(uint8_t addr, uint8_t rw) {
   (void) temp; // prevent unused variable warning
   return 0;
 }
+
+int i2c_write_byte(uint8_t data) {
+  // Send data byte
+  I2C1_DR = data;
+
+  uint32_t timeout = 10000;
+  while (!(I2C1_SR1 & (1 << 7))) {  // wait for TxE flag
+      if (--timeout == 0) return -1;
+  }
+  return 0;
+}
+
+int i2c_read_byte(uint8_t *data, int ack) {
+  if (ack) {
+    I2C1_CR1 |= (1 << 10);  // ACK = 1
+  } else {
+    I2C1_CR1 &= ~(1 << 10); // ACK = 0
+  }
+
+  uint32_t timeout = 10000;
+  while (!(I2C1_SR1 & (1 << 6))) {  // wait for RxNE flag
+      if (--timeout == 0) return -1;
+  }
+  *data = I2C1_DR; // read received byte
+  return 0;
+}

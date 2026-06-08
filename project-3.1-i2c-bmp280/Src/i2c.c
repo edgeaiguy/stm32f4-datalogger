@@ -46,3 +46,34 @@ void i2c_init(void) {
   // enable I2C1
   I2C1_CR1 |= (1 << 0);  // PE = 1
 }
+
+int i2c_start(void) {
+  // Send start condition
+  I2C1_CR1 |= (1 << 8);  // START = 1
+
+  uint32_t timeout = 10000;
+  while (!(I2C1_SR1 & (1 << 0))) {  // wait for SB flag
+      if (--timeout == 0) return -1;
+  }
+  return 0;
+}
+
+void i2c_stop(void) {
+  // Send stop condition
+  I2C1_CR1 |= (1 << 9);  // STOP = 1
+}
+
+int i2c_send_address(uint8_t addr, uint8_t rw) {
+  // Send address with R/W bit
+  I2C1_DR = (addr << 1) | (rw & 0x1);  // LSB is R/W bit
+
+  uint32_t timeout = 10000;
+  while (!(I2C1_SR1 & (1 << 1))) {  // wait for ADDR flag
+      if (--timeout == 0) return -1;
+  }
+  // Clear ADDR flag by reading SR1 and SR2
+  volatile uint32_t temp = I2C1_SR1;
+  temp = I2C1_SR2;
+  (void) temp; // prevent unused variable warning
+  return 0;
+}

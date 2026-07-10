@@ -103,3 +103,24 @@ int i2c_read_byte(uint8_t *data, int ack) {
   *data = I2C1_DR; // read received byte
   return 0;
 }
+
+int i2c_write_register(uint8_t dev_addr, uint8_t reg_addr, uint8_t data) {
+    if (i2c_start() != 0) return -1;
+    if (i2c_send_address(dev_addr, 0) != 0) return -1;  // 0 = write
+    if (i2c_write_byte(reg_addr) != 0) return -1;
+    if (i2c_write_byte(data) != 0) return -1;
+    i2c_stop();
+    return 0;
+}
+
+int i2c_read_register(uint8_t dev_addr, uint8_t reg_addr, uint8_t *data) {
+    if (i2c_start() != 0) return -1;
+    if (i2c_send_address(dev_addr, 0) != 0) return -1;  // write phase
+    if (i2c_write_byte(reg_addr) != 0) return -1;
+
+    if (i2c_start() != 0) return -1;                    // repeated start
+    if (i2c_send_address(dev_addr, 1) != 0) return -1;  // read phase
+    if (i2c_read_byte(data, 0) != 0) return -1;         // NACK = last byte
+    i2c_stop();
+    return 0;
+}

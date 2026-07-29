@@ -24,6 +24,12 @@ void uart2_init(void) {
   USART2_CR1 |= (1 << 13) | (1 << 3); // enable UE (USART Enable) and TE (Transmitter Enable)
 }
 
+/* newlib retarget: _write() in syscalls.c calls this for every printf byte */
+int __io_putchar(int ch) {
+  uart2_write_byte((char)ch);
+  return ch;
+}
+
 /* perform UART tranmission: 10 bits per transmission (start/stop bits + 1 byte of data)*/
 void uart2_write_byte(char ch) {
   // wait until TXE flag in SR is set (bit 7). then write ch to DR

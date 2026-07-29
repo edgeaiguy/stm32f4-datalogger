@@ -81,6 +81,11 @@
 #define ADC1_SR (*(volatile unsigned int *)(ADC1_BASE + 0x00)) // status register
 #define ADC1_DR (*(volatile unsigned int *)(ADC1_BASE + 0x4C)) // data register
 
+/* SCB (System Control Block) - part of the Cortex-M4 core, not a peripheral */
+#define SCB_BASE 0xE000ED00UL // SCB base address
+#define SCB_CPACR (*(volatile unsigned int *)(SCB_BASE + 0x88)) // coprocessor access control register (FPU enable)
+#define SCB_CPACR_FPU_EN (0xFU << 20) // full access to CP10 and CP11 (the FPU)
+
 /* I2C */
 #define I2C1_BASE 0x40005400UL // I2C1 base address
 #define I2C1_CR1 (*(volatile unsigned int *)(I2C1_BASE + 0x00)) // I2C1 control register 1

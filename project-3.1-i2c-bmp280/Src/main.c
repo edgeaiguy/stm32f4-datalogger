@@ -1,19 +1,14 @@
 #include <stdio.h>
 #include "stm32f407xx.h"
 #include "uart2.h"
+#include "systick.h"
 #include "i2c.h"
 #include "bmp280.h"
 
-/* Crude blocking delay. Approximate only - it is a spin loop, so it shifts with
- * optimization flags and clock changes. Replace with SysTick once the logger
- * needs real timestamps. */
-static void delay_ms(uint32_t ms) {
-    for (uint32_t i = 0; i < ms; i++) {
-        for (volatile uint32_t j = 0; j < 1600; j++);
-    }
-}
+#define SAMPLE_INTERVAL_MS 1000
 
 int main(void) {
+    systick_init();
     uart2_init();
     i2c_init();
 
@@ -43,14 +38,24 @@ int main(void) {
     printf("       P6=%d P7=%d P8=%d P9=%d\r\n",
            calib.dig_P6, calib.dig_P7, calib.dig_P8, calib.dig_P9);
 
+    // Schedule against absolute deadlines rather than delaying after each sample.
+    // A measurement takes ~45 ms, so "read, then wait 1000 ms" would drift to a
+    // 1045 ms period; advancing a deadline keeps the cadence at exactly 1000 ms.
+    uint32_t next_sample = systick_millis();
+
     while (1) {
+        // Signed difference so this stays correct across the counter wrap: it asks
+        // "is now still before the deadline?" rather than comparing magnitudes.
+        while ((int32_t)(systick_millis() - next_sample) < 0) {}
+        next_sample += SAMPLE_INTERVAL_MS;
+
+        uint32_t t_ms = systick_millis();
         int32_t temp_c100;
         uint32_t press_q24_8;
 
         if (bmp280_read(&calib, &temp_c100, &press_q24_8) != 0) {
             printf("ERROR: measurement failed\r\n");
-            delay_ms(1000);
-            continue;
+            continue;  // back to the deadline wait, so a failure does not break cadence
         }
 
         // split the fixed-point values into integer and fractional parts so we
@@ -61,11 +66,10 @@ int main(void) {
 
         uint32_t pa = press_q24_8 >> 8;  // Q24.8 -> whole Pa
 
-        printf("T = %s%ld.%02ld C   P = %lu.%02lu hPa   (%lu Pa)\r\n",
+        printf("[%lu.%03lu] T = %s%ld.%02ld C   P = %lu.%02lu hPa   (%lu Pa)\r\n",
+               (unsigned long)(t_ms / 1000), (unsigned long)(t_ms % 1000),
                sign, (long)(t / 100), (long)(t % 100),
                (unsigned long)(pa / 100), (unsigned long)(pa % 100),
                (unsigned long)pa);
-
-        delay_ms(1000);
     }
 }

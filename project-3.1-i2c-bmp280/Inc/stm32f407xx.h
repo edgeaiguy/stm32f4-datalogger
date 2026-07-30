@@ -86,6 +86,17 @@
 #define SCB_CPACR (*(volatile unsigned int *)(SCB_BASE + 0x88)) // coprocessor access control register (FPU enable)
 #define SCB_CPACR_FPU_EN (0xFU << 20) // full access to CP10 and CP11 (the FPU)
 
+/* SysTick - also part of the Cortex-M4 core, described in the programming manual
+ * (PM0214) rather than the reference manual */
+#define SYSTICK_BASE 0xE000E010UL // SysTick base address
+#define STK_CTRL (*(volatile unsigned int *)(SYSTICK_BASE + 0x00)) // control and status register
+#define STK_LOAD (*(volatile unsigned int *)(SYSTICK_BASE + 0x04)) // reload value register
+#define STK_VAL  (*(volatile unsigned int *)(SYSTICK_BASE + 0x08)) // current value register
+
+#define STK_CTRL_ENABLE    (1U << 0) // start counting
+#define STK_CTRL_TICKINT   (1U << 1) // raise the SysTick exception when the counter reloads
+#define STK_CTRL_CLKSOURCE (1U << 2) // 1 = processor clock, 0 = processor clock / 8
+
 /* I2C */
 #define I2C1_BASE 0x40005400UL // I2C1 base address
 #define I2C1_CR1 (*(volatile unsigned int *)(I2C1_BASE + 0x00)) // I2C1 control register 1

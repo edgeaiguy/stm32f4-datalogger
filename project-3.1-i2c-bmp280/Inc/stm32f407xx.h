@@ -98,3 +98,21 @@
 #define I2C1_CCR (*(volatile unsigned int *)(I2C1_BASE + 0x1C)) // I2C1 clock control register
 #define I2C1_TRISE (*(volatile unsigned int *)(I2C1_BASE + 0x20)) // I2C1 TRISE register
 #define I2C1_FLTR (*(volatile unsigned int *)(I2C1_BASE + 0x24)) // I2C1 FLTR register
+
+/* I2C1_CR1 bits */
+#define I2C_CR1_PE    (1U << 0)  // peripheral enable
+#define I2C_CR1_START (1U << 8)  // generate start condition
+#define I2C_CR1_STOP  (1U << 9)  // generate stop condition
+#define I2C_CR1_ACK   (1U << 10) // 1 = ACK the received byte, 0 = NACK
+#define I2C_CR1_POS   (1U << 11) // 0 = ACK bit applies to the byte in the shift register, 1 = to the next one
+
+/* I2C1_SR1 bits */
+#define I2C_SR1_SB    (1U << 0)  // start condition generated
+#define I2C_SR1_ADDR  (1U << 1)  // address sent and acknowledged
+#define I2C_SR1_BTF   (1U << 2)  // byte transfer finished (DR and shift register both full)
+#define I2C_SR1_RXNE  (1U << 6)  // DR holds a received byte
+#define I2C_SR1_TXE   (1U << 7)  // DR is empty and ready for the next byte
+#define I2C_SR1_AF    (1U << 10) // acknowledge failure: the slave did not respond
+
+/* I2C1_SR2 bits */
+#define I2C_SR2_BUSY  (1U << 1)  // a transfer is in progress on the bus

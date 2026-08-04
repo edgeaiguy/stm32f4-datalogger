@@ -4,9 +4,11 @@
 #define RCC_BASE  0x40023800UL // RCC base address. Note: end all hex address defines with UL (unsigned long)
 #define RCC_AHB1ENR  (*(volatile unsigned int *)(RCC_BASE + 0x30)) // AHB1ENR is at offset 0x30. GPIOs lives here
 #define RCC_AHB1ENR_GPIOBEN (1U << 1) // GPIOBEN bit is bit 1 in AHB1ENR
+#define RCC_AHB1ENR_GPIOEEN (1U << 4) // GPIOEEN bit is bit 4 in AHB1ENR
 #define RCC_APB1ENR (*(volatile unsigned int *)(RCC_BASE + 0x40)) // APB1ENR is at offset 0x40. UART2/I2C1 lives here.
 #define RCC_APB1ENR_I2C1EN  (1U << 21) // I2C1EN bit is bit 21 in APB1ENR
 #define RCC_APB2ENR (*(volatile unsigned int *)(RCC_BASE + 0x44)) // APB2ENR is at offset 0x44. SYSCFG lives here
+#define RCC_APB2ENR_SPI1EN (1U << 12) // SPI1EN bit is bit 12 in APB2ENR
 
 /* GPIOA */
 #define GPIOA_BASE 0x40020000UL // GPIOA base address. PA2 and PA3 (for UART comms) live here, also PA0 blue button
@@ -26,6 +28,15 @@
 #define GPIOD_ODR (*(volatile unsigned int *)(GPIOD_BASE + 0x14)) // GPIOD_ODR (output data register) is at offset 0x14
 #define GPIOD_BSRR (*(volatile unsigned int *)(GPIOD_BASE + 0x18)) // GPIOD_BSRR (bit set/reset register) is at offset 0x18
 #define GPIOD_AFRH (*(volatile unsigned int *)(GPIOD_BASE + 0x24)) // alternate function high (GPIOD pins 8-15) register offset
+/* ---- GPIOE (AHB1, base 0x4002_1000) ---- */
+#define GPIOE_BASE      0x40021000UL
+#define GPIOE_MODER     (*(volatile uint32_t *)(GPIOE_BASE + 0x00))
+#define GPIOE_OTYPER    (*(volatile uint32_t *)(GPIOE_BASE + 0x04))
+#define GPIOE_OSPEEDR   (*(volatile uint32_t *)(GPIOE_BASE + 0x08))
+#define GPIOE_PUPDR     (*(volatile uint32_t *)(GPIOE_BASE + 0x0C))
+#define GPIOE_IDR       (*(volatile uint32_t *)(GPIOE_BASE + 0x10))
+#define GPIOE_ODR       (*(volatile uint32_t *)(GPIOE_BASE + 0x14))
+#define GPIOE_BSRR      (*(volatile uint32_t *)(GPIOE_BASE + 0x18))
 
 /* USART2 */
 #define USART2_BASE 0x40004400UL // USART2 base address (from memory map)
@@ -127,3 +138,10 @@
 
 /* I2C1_SR2 bits */
 #define I2C_SR2_BUSY  (1U << 1)  // a transfer is in progress on the bus
+
+/* ---- SPI1 (APB2, base 0x4001_3000) ---- */
+#define SPI1_BASE       0x40013000UL
+#define SPI1_CR1        (*(volatile uint32_t *)(SPI1_BASE + 0x00))
+#define SPI1_CR2        (*(volatile uint32_t *)(SPI1_BASE + 0x04))
+#define SPI1_SR         (*(volatile uint32_t *)(SPI1_BASE + 0x08))
+#define SPI1_DR         (*(volatile uint32_t *)(SPI1_BASE + 0x0C))

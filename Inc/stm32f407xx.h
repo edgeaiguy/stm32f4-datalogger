@@ -3,6 +3,7 @@
 /* Clock enable */
 #define RCC_BASE  0x40023800UL // RCC base address. Note: end all hex address defines with UL (unsigned long)
 #define RCC_AHB1ENR  (*(volatile unsigned int *)(RCC_BASE + 0x30)) // AHB1ENR is at offset 0x30. GPIOs lives here
+#define RCC_AHB1ENR_GPIOAEN (1U << 0) // GPIOAEN bit is bit 0 in AHB1ENR
 #define RCC_AHB1ENR_GPIOBEN (1U << 1) // GPIOBEN bit is bit 1 in AHB1ENR
 #define RCC_AHB1ENR_GPIOEEN (1U << 4) // GPIOEEN bit is bit 4 in AHB1ENR
 #define RCC_APB1ENR (*(volatile unsigned int *)(RCC_BASE + 0x40)) // APB1ENR is at offset 0x40. UART2/I2C1 lives here.
@@ -13,8 +14,9 @@
 /* GPIOA */
 #define GPIOA_BASE 0x40020000UL // GPIOA base address. PA2 and PA3 (for UART comms) live here, also PA0 blue button
 #define GPIOA_MODER (*(volatile unsigned int *)(GPIOA_BASE + 0x00)) //GPIOA_MODER is the first register in GPIOA
-#define GPIOA_AFRL (*(volatile unsigned int *)(GPIOA_BASE + 0x20)) // also define the alternate function low register offset
+#define GPIOA_OSPEEDR (*(volatile unsigned int *)(GPIOA_BASE + 0x08)) // GPIOA_OSPEEDR is at offset 0x08
 #define GPIOA_PUPDR (*(volatile unsigned int *)(GPIOA_BASE + 0x0C)) // pull-up pull-down register (for button)
+#define GPIOA_AFRL (*(volatile unsigned int *)(GPIOA_BASE + 0x20)) // also define the alternate function low register offset
 /* GPIOB */
 #define GPIOB_BASE 0x40020400UL // GPIOB base address. PB6 and PB7 (for I2C comms) live here
 #define GPIOB_MODER (*(volatile unsigned int *)(GPIOB_BASE + 0x00)) // GPIOB_MODER is the first register in GPIOB

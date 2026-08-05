@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include "stm32f407xx.h"
 #include "spi.h"
-#include "adxl345.h"
 
 void spi_init(void) {
     // Enable GPIOA and SPI1 clocks
@@ -37,9 +36,6 @@ void spi_init(void) {
 
     /* Enable the peripheral — SPE last, after all config is set */
     SPI1_CR1 |= (1 << 6);          /* SPE = 1 */
-
-    /* CS resting state */
-    ADXL345_CS_HIGH();
 }
 
 uint8_t spi_transfer(uint8_t data) {

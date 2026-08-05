@@ -7,11 +7,7 @@
 
 #define SAMPLE_INTERVAL_MS 1000
 
-int main(void) {
-    systick_init();
-    uart2_init();
-    i2c_init();
-
+void bmp280_bringup(void) {
     printf("Initializing BMP280...\r\n");
 
     uint8_t id = 0;
@@ -71,5 +67,39 @@ int main(void) {
                sign, (long)(t / 100), (long)(t % 100),
                (unsigned long)(pa / 100), (unsigned long)(pa % 100),
                (unsigned long)pa);
+    }
+}
+
+int main(void) {
+    systick_init();
+    uart2_init();
+    i2c_init();
+
+    printf("Initializing ADXL345...\r\n");
+
+    /* Identity check gates everything — proves SPI end-to-end before configuring */
+    uint8_t id = adxl345_read_register(0x00);   /* DEVID */
+    printf("ADXL345 ID: 0x%02X (expect 0xE5)\r\n", id);
+    if (id != 0xE5) {
+        printf("Unexpected chip ID — check wiring / CPOL-CPHA\r\n");
+        while (1);
+    }
+
+    adxl345_init();   /* now safe to configure: DATA_FORMAT + POWER_CTL */
+
+    int16_t x, y, z;
+    uint32_t next_sample = systick_millis();
+
+    while (1) {
+        while ((int32_t)(systick_millis() - next_sample) < 0) {}
+        next_sample += 200;   /* 5 Hz for bring-up */
+
+        adxl345_read_xyz(&x, &y, &z);
+
+        /* ±2g full-res → 256 LSB/g. Integer milli-g, no float path. */
+        int xm = (x * 1000) / 256;
+        int ym = (y * 1000) / 256;
+        int zm = (z * 1000) / 256;
+        printf("X:%5d  Y:%5d  Z:%5d  (mg)\r\n", xm, ym, zm);
     }
 }

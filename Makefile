@@ -1,5 +1,5 @@
 # Project name
-TARGET = i2c-bmp280
+TARGET = stm32f4-datalogger
 
 # Toolchain
 CC = arm-none-eabi-gcc

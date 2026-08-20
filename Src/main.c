@@ -4,6 +4,8 @@
 #include "systick.h"
 #include "i2c.h"
 #include "bmp280.h"
+#include "spi.h"
+#include "adxl345.h"
 
 #define SAMPLE_INTERVAL_MS 1000
 
@@ -73,15 +75,24 @@ void bmp280_bringup(void) {
 int main(void) {
     systick_init();
     uart2_init();
-    i2c_init();
+    //i2c_init();
+    spi_init();
 
     printf("Initializing ADXL345...\r\n");
 
-    /* Identity check gates everything — proves SPI end-to-end before configuring */
-    uint8_t id = adxl345_read_register(0x00);   /* DEVID */
-    printf("ADXL345 ID: 0x%02X (expect 0xE5)\r\n", id);
-    if (id != 0xE5) {
-        printf("Unexpected chip ID — check wiring / CPOL-CPHA\r\n");
+    /* Five DEVID reads, not one: on a shared bus a lone 0xE5 can be luck, while
+     * five identical reads mean every other slave really is parked off MISO. */
+    int stable = 1;
+    printf("DEVID:");
+    for (int i = 0; i < 5; i++) {
+        uint8_t id = adxl345_read_register(ADXL345_DEVID_REG);
+        printf(" 0x%02X", id);
+        if (id != ADXL345_DEVID) stable = 0;
+    }
+    printf("   (expect 0x%02X)\r\n", ADXL345_DEVID);
+
+    if (!stable) {
+        printf("ADXL345 not responding — check CS parking in spi_init()\r\n");
         while (1);
     }
 

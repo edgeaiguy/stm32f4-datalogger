@@ -4,8 +4,13 @@
 #include <stdint.h>
 #include "stm32f407xx.h"
 
-#define ADXL345_CS_HIGH()  (GPIOE_BSRR = (1 << 3))        /* deselect */
-#define ADXL345_CS_LOW()   (GPIOE_BSRR = (1 << (3 + 16))) /* select   */
+#define ADXL345_DEVID_REG  0x00   /* device ID register */
+#define ADXL345_DEVID      0xE5   /* its fixed value — proves the bus end-to-end */
+
+/* CS is on PE2, not PE3 — PE3 is the Discovery's onboard LIS3DSH chip select.
+ * The pin is configured in spi_init(); keep the two in sync. */
+#define ADXL345_CS_HIGH()  (GPIOE_BSRR = (1 << 2))        /* deselect */
+#define ADXL345_CS_LOW()   (GPIOE_BSRR = (1 << (2 + 16))) /* select   */
 
 void    adxl345_init(void);
 uint8_t adxl345_read_register(uint8_t reg);

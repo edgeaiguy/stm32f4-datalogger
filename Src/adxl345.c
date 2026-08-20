@@ -5,7 +5,6 @@
 #include "adxl345.h"
 
 /* --- register map --- */
-#define ADXL345_DEVID        0x00   /* WHO_AM_I, reads 0xE5 */
 #define ADXL345_POWER_CTL    0x2D
 #define ADXL345_DATA_FORMAT  0x31
 #define ADXL345_DATAX0       0x32   /* X/Y/Z span 0x32–0x37, low byte first */

@@ -7,9 +7,12 @@
 #include "spi.h"
 #include "adxl345.h"
 
-#define SAMPLE_INTERVAL_MS 1000
+#define TICK_MS       200   /* accelerometer cadence: 5 Hz */
+#define ENV_DECIMATE  5     /* barometer runs every 5th tick: 1 Hz */
 
-void bmp280_bringup(void) {
+/* Prove the I2C link and load factory calibration. Halts on failure: there is
+ * nothing worth logging from a sensor that never answered. */
+static void bmp280_bringup(bmp280_calib_t *calib) {
     printf("Initializing BMP280...\r\n");
 
     uint8_t id = 0;
@@ -18,70 +21,29 @@ void bmp280_bringup(void) {
         while (1);
     }
 
-    printf("BMP280 ID: 0x%02X\r\n", id);
+    printf("BMP280 ID: 0x%02X (expect 0x%02X)\r\n", id, BMP280_CHIP_ID);
     if (id != BMP280_CHIP_ID) {
-        printf("Unexpected chip ID (expected 0x%02X)\r\n", BMP280_CHIP_ID);
+        printf("Unexpected chip ID\r\n");
         while (1);
     }
 
-    bmp280_calib_t calib;
-    if (bmp280_init(&calib) != 0) {
+    if (bmp280_init(calib) != 0) {
         printf("ERROR: calibration read failed\r\n");
         while (1);
     }
 
-    printf("calib: T1=%u T2=%d T3=%d\r\n", calib.dig_T1, calib.dig_T2, calib.dig_T3);
+    printf("calib: T1=%u T2=%d T3=%d\r\n", calib->dig_T1, calib->dig_T2, calib->dig_T3);
     printf("       P1=%u P2=%d P3=%d P4=%d P5=%d\r\n",
-           calib.dig_P1, calib.dig_P2, calib.dig_P3, calib.dig_P4, calib.dig_P5);
+           calib->dig_P1, calib->dig_P2, calib->dig_P3, calib->dig_P4, calib->dig_P5);
     printf("       P6=%d P7=%d P8=%d P9=%d\r\n",
-           calib.dig_P6, calib.dig_P7, calib.dig_P8, calib.dig_P9);
-
-    // Schedule against absolute deadlines rather than delaying after each sample.
-    // A measurement takes ~45 ms, so "read, then wait 1000 ms" would drift to a
-    // 1045 ms period; advancing a deadline keeps the cadence at exactly 1000 ms.
-    uint32_t next_sample = systick_millis();
-
-    while (1) {
-        // Signed difference so this stays correct across the counter wrap: it asks
-        // "is now still before the deadline?" rather than comparing magnitudes.
-        while ((int32_t)(systick_millis() - next_sample) < 0) {}
-        next_sample += SAMPLE_INTERVAL_MS;
-
-        uint32_t t_ms = systick_millis();
-        int32_t temp_c100;
-        uint32_t press_q24_8;
-
-        if (bmp280_read(&calib, &temp_c100, &press_q24_8) != 0) {
-            printf("ERROR: measurement failed\r\n");
-            continue;  // back to the deadline wait, so a failure does not break cadence
-        }
-
-        // split the fixed-point values into integer and fractional parts so we
-        // never have to pull float formatting into printf
-        int32_t t = temp_c100;
-        const char *sign = (t < 0) ? "-" : "";
-        if (t < 0) t = -t;
-
-        uint32_t pa = press_q24_8 >> 8;  // Q24.8 -> whole Pa
-
-        printf("[%lu.%03lu] T = %s%ld.%02ld C   P = %lu.%02lu hPa   (%lu Pa)\r\n",
-               (unsigned long)(t_ms / 1000), (unsigned long)(t_ms % 1000),
-               sign, (long)(t / 100), (long)(t % 100),
-               (unsigned long)(pa / 100), (unsigned long)(pa % 100),
-               (unsigned long)pa);
-    }
+           calib->dig_P6, calib->dig_P7, calib->dig_P8, calib->dig_P9);
 }
 
-int main(void) {
-    systick_init();
-    uart2_init();
-    //i2c_init();
-    spi_init();
-
+/* Five DEVID reads, not one: on a shared bus a lone 0xE5 can be luck, while
+ * five identical reads mean every other slave really is parked off MISO. */
+static void adxl345_bringup(void) {
     printf("Initializing ADXL345...\r\n");
 
-    /* Five DEVID reads, not one: on a shared bus a lone 0xE5 can be luck, while
-     * five identical reads mean every other slave really is parked off MISO. */
     int stable = 1;
     printf("DEVID:");
     for (int i = 0; i < 5; i++) {
@@ -96,21 +58,75 @@ int main(void) {
         while (1);
     }
 
-    adxl345_init();   /* now safe to configure: DATA_FORMAT + POWER_CTL */
+    adxl345_init();   /* safe to configure now: DATA_FORMAT + POWER_CTL */
+}
 
-    int16_t x, y, z;
+int main(void) {
+    systick_init();
+    uart2_init();
+    i2c_init();
+    spi_init();
+
+    bmp280_calib_t calib;
+    bmp280_bringup(&calib);
+    adxl345_bringup();
+
+    /* Held between barometer ticks so every line carries a full record. */
+    int32_t  temp_c100 = 0;
+    uint32_t press_q24_8 = 0;
+    int env_valid = 0;
+
+    uint32_t tick = 0;
     uint32_t next_sample = systick_millis();
 
     while (1) {
+        // Signed difference so this stays correct across the counter wrap: it asks
+        // "is now still before the deadline?" rather than comparing magnitudes.
         while ((int32_t)(systick_millis() - next_sample) < 0) {}
-        next_sample += 200;   /* 5 Hz for bring-up */
+        next_sample += TICK_MS;
 
+        uint32_t t_ms = systick_millis();
+
+        /* Accelerometer first. It is a microsecond-scale SPI read, so taking it
+         * ahead of the barometer's ~43 ms blocking conversion keeps motion
+         * samples on an even cadence instead of jittering by whether this tick
+         * happened to include an environmental read. */
+        int16_t x, y, z;
         adxl345_read_xyz(&x, &y, &z);
+
+        if (tick % ENV_DECIMATE == 0) {
+            if (bmp280_read(&calib, &temp_c100, &press_q24_8) == 0) {
+                env_valid = 1;
+            } else {
+                printf("WARN: BMP280 measurement failed\r\n");
+            }
+        }
+        tick++;
 
         /* ±2g full-res → 256 LSB/g. Integer milli-g, no float path. */
         int xm = (x * 1000) / 256;
         int ym = (y * 1000) / 256;
         int zm = (z * 1000) / 256;
-        printf("X:%5d  Y:%5d  Z:%5d  (mg)\r\n", xm, ym, zm);
+
+        printf("[%lu.%03lu] ",
+               (unsigned long)(t_ms / 1000), (unsigned long)(t_ms % 1000));
+
+        if (env_valid) {
+            // split the fixed-point values into integer and fractional parts so we
+            // never have to pull float formatting into printf
+            int32_t t = temp_c100;
+            const char *sign = (t < 0) ? "-" : "";
+            if (t < 0) t = -t;
+
+            uint32_t pa = press_q24_8 >> 8;  // Q24.8 -> whole Pa
+
+            printf("T=%s%ld.%02ld C  P=%lu.%02lu hPa  ",
+                   sign, (long)(t / 100), (long)(t % 100),
+                   (unsigned long)(pa / 100), (unsigned long)(pa % 100));
+        } else {
+            printf("T=  --.-- C  P= ---.-- hPa  ");
+        }
+
+        printf("X:%5d Y:%5d Z:%5d mg\r\n", xm, ym, zm);
     }
 }

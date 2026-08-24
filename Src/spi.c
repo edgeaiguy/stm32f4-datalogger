@@ -7,7 +7,7 @@ static void spi_park_clock(void);
 void spi_init(void) {
     // Enable GPIOA and SPI1 clocks
     RCC_AHB1ENR |= RCC_AHB1ENR_GPIOAEN; // enable GPIOA clock (PA5, PA6, PA7 for SPI)
-    RCC_AHB1ENR |= RCC_AHB1ENR_GPIOEEN; // enable GPIOE clock (PE2, PE3 chip selects)
+    RCC_AHB1ENR |= RCC_AHB1ENR_GPIOEEN; // enable GPIOE clock (PE2, PE3, PE4 chip selects)
     RCC_APB2ENR |= RCC_APB2ENR_SPI1EN;  // enable SPI1 clock
     volatile unsigned int tmp = RCC_APB2ENR; (void) tmp; // readback to ensure clock is enabled
 
@@ -20,22 +20,26 @@ void spi_init(void) {
 
     GPIOA_OSPEEDR |= ((0x3 << 10) | (0x3 << 12) | (0x3 << 14)); // set PA5, PA6, PA7 to very high speed
 
+    GPIOA_PUPDR &= ~(0x3 << 12);  // clear bits [13:12] for PA6
+    GPIOA_PUPDR |= (0x1 << 12);   // pull-up on MISO: keeps the line defined when no slave drives it
+
     /* Every slave on SPI1 needs its CS actively driven high when idle — a CS
      * left floating lets that chip drive MISO against whoever is selected.
-     * PE2 = ADXL345 (keep in sync with adxl345.h), PE3 = onboard LIS3DSH. */
-    GPIOE_MODER &= ~((0x3 << 4) | (0x3 << 6)); // clear bits [5:4] PE2, [7:6] PE3
-    GPIOE_MODER |= ((0x1 << 4) | (0x1 << 6));  // both to output mode
-    GPIOE_OSPEEDR |= (0x3 << 4);               // PE2 very high speed
-    GPIOE_BSRR = (1 << 2) | (1 << 3);          // both deselected; PE3 stays parked
+     * PE2 = ADXL345 (adxl345.h), PE3 = onboard LIS3DSH, PE4 = SD card (sdcard.h). */
+    GPIOE_MODER &= ~((0x3 << 4) | (0x3 << 6) | (0x3 << 8)); // clear PE2, PE3, PE4
+    GPIOE_MODER |= ((0x1 << 4) | (0x1 << 6) | (0x1 << 8));  // all three to output mode
+    GPIOE_OTYPER &= ~((1 << 2) | (1 << 3) | (1 << 4));      // push-pull
+    GPIOE_OSPEEDR |= ((0x3 << 4) | (0x3 << 8));             // PE2, PE4 very high speed
+    GPIOE_BSRR = (1 << 2) | (1 << 3) | (1 << 4);            // all deselected; PE3 stays parked
 
     /* SPI1 config — configure while SPE=0, enable last */
     SPI1_CR1 = 0;                  /* clean slate */
     SPI1_CR1 |= (1 << 2);          /* MSTR = master */
     SPI1_CR1 |= (1 << 1);          /* CPOL = 1  ┐ mode 3 */
     SPI1_CR1 |= (1 << 0);          /* CPHA = 1  ┘ */
-    /* PCLK2 = 16 MHz (HSI, no PLL — see SystemInit); /32 keeps SCK well under
-     * the ADXL345's 5 MHz ceiling with margin for breadboard wiring. */
-    SPI1_CR1 |= (4 << 3);          /* BR = 100 → PCLK2/32 = 500 kHz */
+    /* /32 keeps SCK well under the ADXL345's 5 MHz ceiling with margin for
+     * breadboard wiring. sdcard.c retunes this per phase via spi_set_baudrate(). */
+    SPI1_CR1 |= (SPI_BR_DIV32 << 3);
     SPI1_CR1 |= (1 << 9);          /* SSM = 1  (software slave mgmt) */
     SPI1_CR1 |= (1 << 8);          /* SSI = 1  (internal NSS high — no MODF) */
     /* DFF bit 11 = 0 → 8-bit frames; LSBFIRST bit 7 = 0 → MSB first */
@@ -65,6 +69,19 @@ uint8_t spi_transfer(uint8_t data) {
     timeout = 10000;
     while ((SPI1_SR & (1 << 7)) && --timeout);    // BSY: shifter idle
     return rx;
+}
+
+/* BR can only be written with the peripheral disabled, and disabling it mid-frame
+ * truncates whatever is in the shifter — so drain both directions first. */
+void spi_set_baudrate(uint32_t br) {
+    uint32_t timeout = 10000;
+    while ((SPI1_SR & (1 << 0)) && --timeout) { (void)SPI1_DR; }  // RXNE: discard stale byte
+    timeout = 10000;
+    while ((SPI1_SR & (1 << 7)) && --timeout);                    // BSY: shifter idle
+
+    SPI1_CR1 &= ~(1 << 6);                    /* SPE = 0 */
+    SPI1_CR1 = (SPI1_CR1 & ~(0x7 << 3)) | ((br & 0x7) << 3);
+    SPI1_CR1 |= (1 << 6);                     /* SPE = 1 */
 }
 
 /* Park SCK at its CPOL idle level before the first CS assertion. Straight out

@@ -9,7 +9,7 @@ OBJCOPY = arm-none-eabi-objcopy
 SIZE = arm-none-eabi-size
 
 # Sources
-C_SOURCES = Src/main.c Src/system_stm32f4xx.c Src/syscalls.c Src/sysmem.c Src/systick.c Src/uart2.c Src/i2c.c Src/bmp280.c Src/spi.c Src/adxl345.c
+C_SOURCES = Src/main.c Src/system_stm32f4xx.c Src/syscalls.c Src/sysmem.c Src/systick.c Src/uart2.c Src/i2c.c Src/bmp280.c Src/spi.c Src/adxl345.c Src/sdcard.c
 ASM_SOURCES = Startup/startup_stm32f407vgtx.s
 
 # Linker script

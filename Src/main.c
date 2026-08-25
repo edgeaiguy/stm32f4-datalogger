@@ -11,6 +11,11 @@
 #define TICK_MS       200   /* accelerometer cadence: 5 Hz */
 #define ENV_DECIMATE  5     /* barometer runs every 5th tick: 1 Hz */
 
+/* The write test destroys this block on every boot. Junk card only — set to 0
+ * to skip it once the card holds anything worth keeping. */
+#define SD_WRITE_TEST   1
+#define SD_SCRATCH_LBA  8192
+
 /* Prove the I2C link and load factory calibration. Halts on failure: there is
  * nothing worth logging from a sensor that never answered. */
 static void bmp280_bringup(bmp280_calib_t *calib) {
@@ -69,6 +74,41 @@ static void adxl345_bringup(void) {
     adxl345_init();   /* safe to configure now: DATA_FORMAT + POWER_CTL */
 }
 
+#if SD_WRITE_TEST
+/* Write-then-read-back-identical is the write half's 0x55AA: a result the path
+ * cannot produce unless every stage of it worked. */
+static void sdcard_write_test(void) {
+    static uint8_t wbuf[SD_BLOCK_SIZE];
+    static uint8_t rbuf[SD_BLOCK_SIZE];
+
+    /* A varying pattern rather than a constant fill — a stuck bus or a short
+     * read then shows up as a wrong index instead of passing by accident. */
+    for (uint32_t i = 0; i < SD_BLOCK_SIZE; i++) wbuf[i] = (uint8_t)(i ^ 0x5A);
+
+    printf("Writing scratch LBA %u...\r\n", (unsigned)SD_SCRATCH_LBA);
+    int rc = sdcard_write_block(SD_SCRATCH_LBA, wbuf);
+    if (rc != 0) {
+        printf("ERROR: write failed (%d)\r\n", rc);
+        return;
+    }
+
+    rc = sdcard_read_block(SD_SCRATCH_LBA, rbuf);
+    if (rc != 0) {
+        printf("ERROR: read-back failed (%d)\r\n", rc);
+        return;
+    }
+
+    for (uint32_t i = 0; i < SD_BLOCK_SIZE; i++) {
+        if (rbuf[i] != wbuf[i]) {
+            printf("MISMATCH at byte %u: wrote 0x%02X, read 0x%02X\r\n",
+                   (unsigned)i, wbuf[i], rbuf[i]);
+            return;
+        }
+    }
+    printf("write/read-back verified: %u bytes identical\r\n", SD_BLOCK_SIZE);
+}
+#endif
+
 static void sdcard_bringup(void) {
     printf("Initializing SD card...\r\n");
 
@@ -92,6 +132,10 @@ static void sdcard_bringup(void) {
     if (block[510] != 0x55 || block[511] != 0xAA) {
         printf("No boot signature — card may be unformatted, but the read path worked\r\n");
     }
+
+#if SD_WRITE_TEST
+    sdcard_write_test();
+#endif
 
     /* The card is on its own bus now, so this should be unconditionally true —
      * which is exactly why it is worth asserting once. */

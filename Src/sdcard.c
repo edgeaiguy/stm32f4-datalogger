@@ -10,6 +10,7 @@
 #define CMD8     8   /* SEND_IF_COND      */
 #define CMD16   16   /* SET_BLOCKLEN      */
 #define CMD17   17   /* READ_SINGLE_BLOCK */
+#define CMD24   24   /* WRITE_BLOCK       */
 #define CMD55   55   /* APP_CMD           */
 #define CMD58   58   /* READ_OCR          */
 #define ACMD41  41   /* SD_SEND_OP_COND   */
@@ -19,7 +20,11 @@
 #define R1_IDLE         0x01
 #define R1_ILLEGAL_CMD  0x04
 
-#define SD_DATA_TOKEN   0xFE  /* precedes a 512-byte read payload */
+#define SD_DATA_TOKEN   0xFE  /* precedes a 512-byte payload, both directions */
+
+/* The card answers a write payload with xxx0sss1; sss = 010 means accepted. */
+#define SD_RESP_MASK     0x1F
+#define SD_RESP_ACCEPTED 0x05
 
 /* CRC7 is only verified while the card is still in idle, so the two commands
  * that run before it leaves idle carry real values and the rest send a dummy. */
@@ -29,6 +34,7 @@
 
 #define INIT_TIMEOUT_MS  1000  /* ACMD41 is spec'd to take up to a second */
 #define READ_TIMEOUT_MS   200
+#define BUSY_TIMEOUT_MS   500  /* a flash program cycle, generously bounded */
 
 static sd_type_t card_type = SD_TYPE_UNKNOWN;
 static int block_addressed;   /* SDHC/SDXC take an LBA; SDSC take a byte offset */
@@ -39,6 +45,16 @@ static uint8_t sd_rx(void) {
 
 static void sd_select(void) {
     SD_CS_LOW();
+}
+
+/* While the card programs flash it holds DO low and ignores everything sent to
+ * it. Waiting it out is what keeps the *next* command from failing. */
+static int sd_wait_not_busy(uint32_t timeout_ms) {
+    uint32_t deadline = systick_millis() + timeout_ms;
+    while ((int32_t)(systick_millis() - deadline) < 0) {
+        if (sd_rx() == 0xFF) return 0;
+    }
+    return -1;
 }
 
 /* Deselect, then clock eight more bits. The card needs them to finish its
@@ -147,6 +163,9 @@ int sdcard_read_block(uint32_t lba, uint8_t *buf) {
     uint32_t addr = block_addressed ? lba : lba * SD_BLOCK_SIZE;
 
     sd_select();
+    /* Self-heal after a write whose busy poll timed out. */
+    if (sd_wait_not_busy(BUSY_TIMEOUT_MS) != 0) { sd_deselect(); return -4; }
+
     if (sd_command(CMD17, addr, CRC_DUMMY) != R1_READY) {
         sd_deselect();
         return -2;
@@ -169,6 +188,42 @@ int sdcard_read_block(uint32_t lba, uint8_t *buf) {
 
     (void)sd_rx();   /* 16-bit CRC, discarded — CRC checking is off in SPI mode */
     (void)sd_rx();
+
+    sd_deselect();
+    return 0;
+}
+
+int sdcard_write_block(uint32_t lba, const uint8_t *buf) {
+    if (card_type == SD_TYPE_UNKNOWN) return -1;
+
+    uint32_t addr = block_addressed ? lba : lba * SD_BLOCK_SIZE;
+
+    sd_select();
+    if (sd_wait_not_busy(BUSY_TIMEOUT_MS) != 0) { sd_deselect(); return -5; }
+
+    if (sd_command(CMD24, addr, CRC_DUMMY) != R1_READY) {
+        sd_deselect();
+        return -2;
+    }
+
+    (void)sd_rx();                      /* one idle byte before the token */
+    spi2_transfer(SD_DATA_TOKEN);
+    for (uint32_t i = 0; i < SD_BLOCK_SIZE; i++) spi2_transfer(buf[i]);
+    spi2_transfer(0xFF);                /* CRC placeholder — checking is off */
+    spi2_transfer(0xFF);
+
+    uint8_t resp = sd_rx();
+    if ((resp & SD_RESP_MASK) != SD_RESP_ACCEPTED) {
+        sd_deselect();
+        return -3;
+    }
+
+    /* Programming starts here, not at the response token. Returning before it
+     * finishes is the classic way to make the next command fail instead. */
+    if (sd_wait_not_busy(BUSY_TIMEOUT_MS) != 0) {
+        sd_deselect();
+        return -4;
+    }
 
     sd_deselect();
     return 0;

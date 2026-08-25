@@ -26,4 +26,8 @@ const char *sdcard_type_name(void);
 /* Read one 512-byte block. buf must have room for SD_BLOCK_SIZE bytes. */
 int sdcard_read_block(uint32_t lba, uint8_t *buf);
 
+/* Write one 512-byte block. Destroys whatever was at that LBA — there is no
+ * undo, and low LBAs hold the partition table and filesystem metadata. */
+int sdcard_write_block(uint32_t lba, const uint8_t *buf);
+
 #endif // SDCARD_H

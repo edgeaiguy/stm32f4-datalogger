@@ -1,4 +1,8 @@
 // NOTE: this file is cheap to include. Include at will
+#ifndef STM32F407XX_H
+#define STM32F407XX_H
+
+#include <stdint.h>
 
 /* Clock enable */
 #define RCC_BASE  0x40023800UL // RCC base address. Note: end all hex address defines with UL (unsigned long)
@@ -8,6 +12,7 @@
 #define RCC_AHB1ENR_GPIOEEN (1U << 4) // GPIOEEN bit is bit 4 in AHB1ENR
 #define RCC_APB1ENR (*(volatile unsigned int *)(RCC_BASE + 0x40)) // APB1ENR is at offset 0x40. UART2/I2C1 lives here.
 #define RCC_APB1ENR_I2C1EN  (1U << 21) // I2C1EN bit is bit 21 in APB1ENR
+#define RCC_APB1ENR_SPI2EN  (1U << 14) // SPI2EN bit is bit 14 in APB1ENR
 #define RCC_APB2ENR (*(volatile unsigned int *)(RCC_BASE + 0x44)) // APB2ENR is at offset 0x44. SYSCFG lives here
 #define RCC_APB2ENR_SPI1EN (1U << 12) // SPI1EN bit is bit 12 in APB2ENR
 
@@ -24,6 +29,7 @@
 #define GPIOB_OSPEEDR (*(volatile unsigned int *)(GPIOB_BASE + 0x08))
 #define GPIOB_PUPDR   (*(volatile unsigned int *)(GPIOB_BASE + 0x0C))
 #define GPIOB_AFRL (*(volatile unsigned int *)(GPIOB_BASE + 0x20)) // also define the alternate function low register offset
+#define GPIOB_AFRH (*(volatile unsigned int *)(GPIOB_BASE + 0x24)) // alternate function high register: pins 8-15 (PB13/14/15 for SPI2)
 /* GPIOD */
 #define GPIOD_BASE  0x40020C00UL // GPIOD base address (from memory map). LEDs live here. UL = unsigned long, compiler treats it as 32-bit value rather than signed integer
 #define GPIOD_MODER (*(volatile unsigned int *)(GPIOD_BASE + 0x00))// GPIOD_MODER is the first register in GPIOD
@@ -147,3 +153,20 @@
 #define SPI1_CR2        (*(volatile uint32_t *)(SPI1_BASE + 0x04))
 #define SPI1_SR         (*(volatile uint32_t *)(SPI1_BASE + 0x08))
 #define SPI1_DR         (*(volatile uint32_t *)(SPI1_BASE + 0x0C))
+
+/* ---- SPI2 (APB1, base 0x4000_3800) ---- */
+#define SPI2_BASE       0x40003800UL
+
+/* The two peripherals have an identical register layout, so the driver works
+ * through this handle instead of duplicating itself per bus. */
+typedef struct {
+    volatile uint32_t CR1;
+    volatile uint32_t CR2;
+    volatile uint32_t SR;
+    volatile uint32_t DR;
+} spi_regs_t;
+
+#define SPI1_REGS  ((spi_regs_t *)SPI1_BASE)
+#define SPI2_REGS  ((spi_regs_t *)SPI2_BASE)
+
+#endif // STM32F407XX_H

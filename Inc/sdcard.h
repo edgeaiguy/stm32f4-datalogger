@@ -4,8 +4,7 @@
 #include <stdint.h>
 #include "stm32f407xx.h"
 
-/* CS is on PE4, configured alongside the other SPI1 chip selects in spi_init().
- * Keep the pin number in sync with that function. */
+/* CS is on PE4, configured in spi2_init(). Keep the pin number in sync. */
 #define SD_CS_HIGH()  (GPIOE_BSRR = (1 << 4))        /* deselect */
 #define SD_CS_LOW()   (GPIOE_BSRR = (1 << (4 + 16))) /* select   */
 
@@ -22,7 +21,6 @@ typedef enum {
  * Returns 0 on success, negative on failure. */
 int sdcard_init(void);
 
-sd_type_t   sdcard_type(void);
 const char *sdcard_type_name(void);
 
 /* Read one 512-byte block. buf must have room for SD_BLOCK_SIZE bytes. */

@@ -58,9 +58,12 @@ static int adxl345_devid_ok(void) {
 static void adxl345_bringup(void) {
     printf("Initializing ADXL345...\r\n");
 
-    if (!adxl345_devid_ok()) {
-        printf("ADXL345 not responding — check CS parking in spi_init()\r\n");
-        while (1);
+    /* Retry rather than halt. A one-shot burst followed by a silent spin is
+     * invisible to a terminal attached after reset, which costs more time than
+     * the failure itself. */
+    while (!adxl345_devid_ok()) {
+        printf("ADXL345 not responding — check the CS wire on PE2\r\n");
+        delay_ms(1000);
     }
 
     adxl345_init();   /* safe to configure now: DATA_FORMAT + POWER_CTL */
@@ -69,10 +72,10 @@ static void adxl345_bringup(void) {
 static void sdcard_bringup(void) {
     printf("Initializing SD card...\r\n");
 
-    int rc = sdcard_init();
-    if (rc != 0) {
-        printf("ERROR: sdcard_init failed (%d)\r\n", rc);
-        while (1);
+    int rc;
+    while ((rc = sdcard_init()) != 0) {
+        printf("sdcard_init failed (%d) — retrying\r\n", rc);
+        delay_ms(1000);
     }
     printf("SD card: %s\r\n", sdcard_type_name());
 
@@ -90,13 +93,11 @@ static void sdcard_bringup(void) {
         printf("No boot signature — card may be unformatted, but the read path worked\r\n");
     }
 
-    /* SD init retuned the prescaler to 4 MHz and ran traffic across a bus the
-     * ADXL shares. Prove the ADXL still answers before trusting the sample loop. */
+    /* The card is on its own bus now, so this should be unconditionally true —
+     * which is exactly why it is worth asserting once. */
     printf("post-SD ");
     if (!adxl345_devid_ok()) {
-        printf("ADXL345 lost after SD init — either the module holds MISO when\r\n"
-               "deselected (move it to SPI2), or 4 MHz is too fast for this wiring\r\n"
-               "(drop SPI_BR_DIV4 to SPI_BR_DIV8 in sdcard_init)\r\n");
+        printf("ADXL345 lost after SD init — the two buses are interfering\r\n");
         while (1);
     }
 }
@@ -105,7 +106,10 @@ int main(void) {
     systick_init();
     uart2_init();
     i2c_init();
-    spi_init();
+    spi_init();    /* SPI1: ADXL345 + onboard LIS3DSH */
+    spi2_init();   /* SPI2: SD card, private bus */
+
+    printf("\r\n");   /* separate the boot banner from any reset noise */
 
     bmp280_calib_t calib;
     bmp280_bringup(&calib);

@@ -1,4 +1,4 @@
-/* sdcard.c — raw SD/SDHC access over SPI1, shared with the ADXL345 */
+/* sdcard.c — raw SD/SDHC access over SPI2, a bus private to the card */
 #include <stdint.h>
 #include "stm32f407xx.h"
 #include "spi.h"
@@ -34,15 +34,15 @@ static sd_type_t card_type = SD_TYPE_UNKNOWN;
 static int block_addressed;   /* SDHC/SDXC take an LBA; SDSC take a byte offset */
 
 static uint8_t sd_rx(void) {
-    return spi_transfer(0xFF);
+    return spi2_transfer(0xFF);
 }
 
 static void sd_select(void) {
     SD_CS_LOW();
 }
 
-/* Deselect, then clock eight more bits. The card needs them to finish releasing
- * DO — without them it can still be driving when the ADXL345 is selected next. */
+/* Deselect, then clock eight more bits. The card needs them to finish its
+ * internal state transition before the next command frame. */
 static void sd_deselect(void) {
     SD_CS_HIGH();
     (void)sd_rx();
@@ -52,12 +52,12 @@ static void sd_deselect(void) {
 static uint8_t sd_command(uint8_t cmd, uint32_t arg, uint8_t crc) {
     (void)sd_rx();                      /* one idle byte ahead of the frame */
 
-    spi_transfer(0x40 | cmd);           /* start bits 01 | index */
-    spi_transfer((uint8_t)(arg >> 24));
-    spi_transfer((uint8_t)(arg >> 16));
-    spi_transfer((uint8_t)(arg >> 8));
-    spi_transfer((uint8_t)arg);
-    spi_transfer(crc);
+    spi2_transfer(0x40 | cmd);           /* start bits 01 | index */
+    spi2_transfer((uint8_t)(arg >> 24));
+    spi2_transfer((uint8_t)(arg >> 16));
+    spi2_transfer((uint8_t)(arg >> 8));
+    spi2_transfer((uint8_t)arg);
+    spi2_transfer(crc);
 
     /* R1 is the first byte back with the MSB clear, within 8 or so. */
     for (int i = 0; i < 10; i++) {
@@ -78,11 +78,9 @@ int sdcard_init(void) {
     card_type = SD_TYPE_UNKNOWN;
     block_addressed = 0;
 
-    spi_set_baudrate(SPI_BR_DIV64);     /* 250 kHz — the card demands a slow clock to wake */
+    spi2_set_baudrate(SPI_BR_DIV64);     /* 250 kHz — the card demands a slow clock to wake */
 
-    /* 80 clocks with every CS parked high is what puts the card into SPI mode.
-     * This only works because spi_init() drives PE2/PE3/PE4 high; a floating CS
-     * here would hand these clocks to some other device on the bus. */
+    /* 80 clocks with CS parked high is what puts the card into SPI mode. */
     SD_CS_HIGH();
     for (int i = 0; i < 10; i++) (void)sd_rx();
 
@@ -139,7 +137,7 @@ int sdcard_init(void) {
     }
 
     sd_deselect();
-    spi_set_baudrate(SPI_BR_DIV4);      /* 4 MHz for the data phase */
+    spi2_set_baudrate(SPI_BR_DIV4);      /* 4 MHz for the data phase */
     return 0;
 }
 
@@ -174,10 +172,6 @@ int sdcard_read_block(uint32_t lba, uint8_t *buf) {
 
     sd_deselect();
     return 0;
-}
-
-sd_type_t sdcard_type(void) {
-    return card_type;
 }
 
 const char *sdcard_type_name(void) {

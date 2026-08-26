@@ -229,6 +229,10 @@ int sdcard_write_block(uint32_t lba, const uint8_t *buf) {
     return 0;
 }
 
+int sdcard_ready(void) {
+    return card_type != SD_TYPE_UNKNOWN;
+}
+
 const char *sdcard_type_name(void) {
     switch (card_type) {
         case SD_TYPE_V1:    return "SDSC v1 (byte addressed)";

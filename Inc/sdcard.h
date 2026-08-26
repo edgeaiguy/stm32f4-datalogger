@@ -23,6 +23,9 @@ int sdcard_init(void);
 
 const char *sdcard_type_name(void);
 
+/* Non-zero once sdcard_init() has identified a card. */
+int sdcard_ready(void);
+
 /* Read one 512-byte block. buf must have room for SD_BLOCK_SIZE bytes. */
 int sdcard_read_block(uint32_t lba, uint8_t *buf);
 

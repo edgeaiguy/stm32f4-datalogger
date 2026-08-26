@@ -9,7 +9,7 @@ OBJCOPY = arm-none-eabi-objcopy
 SIZE = arm-none-eabi-size
 
 # Sources
-C_SOURCES = Src/main.c Src/system_stm32f4xx.c Src/syscalls.c Src/sysmem.c Src/systick.c Src/uart2.c Src/i2c.c Src/bmp280.c Src/spi.c Src/adxl345.c Src/sdcard.c
+C_SOURCES = Src/main.c Src/system_stm32f4xx.c Src/syscalls.c Src/sysmem.c Src/systick.c Src/uart2.c Src/i2c.c Src/bmp280.c Src/spi.c Src/adxl345.c Src/sdcard.c Src/diskio.c Src/datalog.c Lib/fatfs/ff.c
 ASM_SOURCES = Startup/startup_stm32f407vgtx.s
 
 # Linker script
@@ -20,7 +20,7 @@ MCU = -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 
 # Compiler flags
 CFLAGS = $(MCU) -Wall -g -O0 -std=gnu11
-CFLAGS += -DSTM32F407xx -I./Inc
+CFLAGS += -DSTM32F407xx -I./Inc -I./Lib/fatfs
 
 # Linker flags
 LDFLAGS = $(MCU) -T$(LDSCRIPT) --specs=nosys.specs -Wl,-Map=build/$(TARGET).map
@@ -36,6 +36,9 @@ all: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).bin
 	$(SIZE) $(BUILD_DIR)/$(TARGET).elf
 
 $(BUILD_DIR)/%.o: Src/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: Lib/fatfs/%.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/%.o: Startup/%.s | $(BUILD_DIR)

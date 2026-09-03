@@ -7,6 +7,7 @@
 #include "spi.h"
 #include "adxl345.h"
 #include "sdcard.h"
+#include "rtc.h"
 #include "datalog.h"
 
 #define TICK_MS       200   /* accelerometer cadence: 5 Hz */
@@ -112,6 +113,16 @@ int main(void) {
 
     printf("\r\n");   /* separate the boot banner from any reset noise */
 
+    if (rtc_init() == RTC_SRC_NONE) {
+        printf("WARN: no RTC clock source started — timestamps will be wrong\r\n");
+    }
+    rtc_time_t now;
+    rtc_now(&now);
+    printf("RTC: %s%s\r\n", rtc_source_name(),
+           rtc_was_running() ? " (kept running through reset)" : " (seeded from build time)");
+    printf("time: %04u-%02u-%02u %02u:%02u:%02u\r\n",
+           now.year, now.month, now.day, now.hour, now.min, now.sec);
+
     bmp280_calib_t calib;
     bmp280_bringup(&calib);
     adxl345_bringup();
@@ -135,13 +146,13 @@ int main(void) {
     uint32_t next_sample = systick_millis();
 
     while (1) {
-        // Signed difference so this stays correct across the counter wrap: it asks
-        // "is now still before the deadline?" rather than comparing magnitudes.
-        /* If the deadline is already behind us the previous tick overran —
-         * most likely an SD write stalling on card housekeeping. Count it
-         * rather than silently drifting. */
+        /* Already past the deadline means the previous tick overran — most
+         * likely an SD write stalling on card housekeeping. Count it rather
+         * than drifting silently. */
         if ((int32_t)(systick_millis() - next_sample) > 0) overruns++;
 
+        // Signed difference so this stays correct across the counter wrap: it asks
+        // "is now still before the deadline?" rather than comparing magnitudes.
         while ((int32_t)(systick_millis() - next_sample) < 0) {}
         next_sample += TICK_MS;
 

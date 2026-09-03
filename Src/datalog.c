@@ -1,6 +1,7 @@
 /* datalog.c — CSV logging of the fused sensor stream onto the SD card. */
 #include <stdio.h>
 #include "ff.h"
+#include "rtc.h"
 #include "datalog.h"
 
 /* FatFs buffers writes, so nothing is safely on the card until f_sync(). Every
@@ -9,7 +10,7 @@
  * paying it at 5 Hz and risking a stall that overruns the tick. */
 #define DATALOG_SYNC_ROWS  25
 
-#define CSV_HEADER "t_ms,temp_c,press_hpa,accel_x_mg,accel_y_mg,accel_z_mg\r\n"
+#define CSV_HEADER "timestamp,t_ms,temp_c,press_hpa,accel_x_mg,accel_y_mg,accel_z_mg\r\n"
 
 static FATFS    fs;
 static FIL      file;
@@ -44,7 +45,15 @@ static int format_row(char *out, size_t cap, const datalog_row_t *r) {
     int ym = (r->y * 1000) / 256;
     int zm = (r->z * 1000) / 256;
 
-    return snprintf(out, cap, "%lu,%s,%s,%d,%d,%d\r\n",
+    /* Wall clock for humans, t_ms for ordering: the RTC only resolves to its
+     * sub-second tick and could in principle be stepped, while t_ms is
+     * monotonic from boot. */
+    rtc_time_t w;
+    rtc_now(&w);
+
+    return snprintf(out, cap,
+                    "%04u-%02u-%02uT%02u:%02u:%02u.%03u,%lu,%s,%s,%d,%d,%d\r\n",
+                    w.year, w.month, w.day, w.hour, w.min, w.sec, w.ms,
                     (unsigned long)r->t_ms, tbuf, pbuf, xm, ym, zm);
 }
 

@@ -169,4 +169,42 @@ typedef struct {
 #define SPI1_REGS  ((spi_regs_t *)SPI1_BASE)
 #define SPI2_REGS  ((spi_regs_t *)SPI2_BASE)
 
+/* ---- Backup domain: PWR, RCC_BDCR/CSR, RTC ----
+ * The RTC, its backup registers and the LSE oscillator sit in a separate
+ * power/reset domain that a system reset does NOT clear. Reaching it means
+ * getting past three independent locks - see rtc.c. */
+#define RCC_BDCR        (*(volatile uint32_t *)(RCC_BASE + 0x70))
+#define RCC_CSR         (*(volatile uint32_t *)(RCC_BASE + 0x74))
+#define RCC_APB1ENR_PWREN  (1U << 28)
+
+#define RCC_BDCR_LSEON   (1U << 0)
+#define RCC_BDCR_LSERDY  (1U << 1)
+#define RCC_BDCR_RTCSEL_SHIFT  8      /* 00 none, 01 LSE, 10 LSI, 11 HSE/RTCPRE */
+#define RCC_BDCR_RTCSEL_MASK   (0x3U << 8)
+#define RCC_BDCR_RTCEN   (1U << 15)
+#define RCC_BDCR_BDRST   (1U << 16)
+
+#define RCC_CSR_LSION    (1U << 0)
+#define RCC_CSR_LSIRDY   (1U << 1)
+
+#define PWR_BASE        0x40007000UL
+#define PWR_CR          (*(volatile uint32_t *)(PWR_BASE + 0x00))
+#define PWR_CR_DBP      (1U << 8)     /* Disable Backup domain write Protection */
+
+#define RTC_BASE        0x40002800UL
+#define RTC_TR          (*(volatile uint32_t *)(RTC_BASE + 0x00))
+#define RTC_DR          (*(volatile uint32_t *)(RTC_BASE + 0x04))
+#define RTC_CR          (*(volatile uint32_t *)(RTC_BASE + 0x08))
+#define RTC_ISR         (*(volatile uint32_t *)(RTC_BASE + 0x0C))
+#define RTC_PRER        (*(volatile uint32_t *)(RTC_BASE + 0x10))
+#define RTC_WPR         (*(volatile uint32_t *)(RTC_BASE + 0x24))
+#define RTC_SSR         (*(volatile uint32_t *)(RTC_BASE + 0x28))
+#define RTC_BKP0R       (*(volatile uint32_t *)(RTC_BASE + 0x50))
+
+#define RTC_ISR_INITS   (1U << 4)
+#define RTC_ISR_RSF     (1U << 5)     /* calendar shadow registers synchronised */
+#define RTC_ISR_INITF   (1U << 6)     /* initialisation mode entered */
+#define RTC_ISR_INIT    (1U << 7)
+
+
 #endif // STM32F407XX_H

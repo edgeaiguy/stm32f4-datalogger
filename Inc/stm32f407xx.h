@@ -65,7 +65,8 @@
 
 /* NVIC & SysTick: found in programming manual */
 #define NVIC_BASE 0xE000E100UL // NVIC base address --> in 'System Control Space', same for all Cortex-M4 chips
-#define NVIC_ISER0 (*(volatile unsigned int *)(NVIC_BASE + 0x00)) // interrupt set enable register
+#define NVIC_ISER0 (*(volatile unsigned int *)(NVIC_BASE + 0x00)) // interrupt set enable register, IRQ0-31
+#define NVIC_ISER1 (*(volatile unsigned int *)(NVIC_BASE + 0x04)) // interrupt set enable register, IRQ32-63 (USART2 = IRQ38)
 #define NVIC_IPR (*(volatile unsigned int *)(NVIC_BASE + 0x300)) // interrupt priority register
 #define SYSTICK_BASE 0xE000E010UL // SysTack base address
 #define STK_CTRL (*(volatile unsigned int *)(SYSTICK_BASE + 0x00)) // SysTick control and status register

@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include "stm32f407xx.h"
 #include "uart2.h"
 #include "systick.h"
@@ -22,29 +21,29 @@
 /* Prove the I2C link and load factory calibration. Halts on failure: there is
  * nothing worth logging from a sensor that never answered. */
 static void bmp280_bringup(bmp280_calib_t *calib) {
-    printf("Initializing BMP280...\r\n");
+    uart2_printf("Initializing BMP280...\r\n");
 
     uint8_t id = 0;
     if (bmp280_read_id(&id) != 0) {
-        printf("ERROR: I2C read failed\r\n");
+        uart2_printf("ERROR: I2C read failed\r\n");
         while (1);
     }
 
-    printf("BMP280 ID: 0x%02X (expect 0x%02X)\r\n", id, BMP280_CHIP_ID);
+    uart2_printf("BMP280 ID: 0x%02X (expect 0x%02X)\r\n", id, BMP280_CHIP_ID);
     if (id != BMP280_CHIP_ID) {
-        printf("Unexpected chip ID\r\n");
+        uart2_printf("Unexpected chip ID\r\n");
         while (1);
     }
 
     if (bmp280_init(calib) != 0) {
-        printf("ERROR: calibration read failed\r\n");
+        uart2_printf("ERROR: calibration read failed\r\n");
         while (1);
     }
 
-    printf("calib: T1=%u T2=%d T3=%d\r\n", calib->dig_T1, calib->dig_T2, calib->dig_T3);
-    printf("       P1=%u P2=%d P3=%d P4=%d P5=%d\r\n",
+    uart2_printf("calib: T1=%u T2=%d T3=%d\r\n", calib->dig_T1, calib->dig_T2, calib->dig_T3);
+    uart2_printf("       P1=%u P2=%d P3=%d P4=%d P5=%d\r\n",
            calib->dig_P1, calib->dig_P2, calib->dig_P3, calib->dig_P4, calib->dig_P5);
-    printf("       P6=%d P7=%d P8=%d P9=%d\r\n",
+    uart2_printf("       P6=%d P7=%d P8=%d P9=%d\r\n",
            calib->dig_P6, calib->dig_P7, calib->dig_P8, calib->dig_P9);
 }
 
@@ -53,24 +52,24 @@ static void bmp280_bringup(bmp280_calib_t *calib) {
  * Split out so it can be re-run as a regression check after SD traffic. */
 static int adxl345_devid_ok(void) {
     int stable = 1;
-    printf("DEVID:");
+    uart2_printf("DEVID:");
     for (int i = 0; i < 5; i++) {
         uint8_t id = adxl345_read_register(ADXL345_DEVID_REG);
-        printf(" 0x%02X", id);
+        uart2_printf(" 0x%02X", id);
         if (id != ADXL345_DEVID) stable = 0;
     }
-    printf("   (expect 0x%02X)\r\n", ADXL345_DEVID);
+    uart2_printf("   (expect 0x%02X)\r\n", ADXL345_DEVID);
     return stable;
 }
 
 static void adxl345_bringup(void) {
-    printf("Initializing ADXL345...\r\n");
+    uart2_printf("Initializing ADXL345...\r\n");
 
     /* Retry rather than halt. A one-shot burst followed by a silent spin is
      * invisible to a terminal attached after reset, which costs more time than
      * the failure itself. */
     while (!adxl345_devid_ok()) {
-        printf("ADXL345 not responding — check the CS wire on PE2\r\n");
+        uart2_printf("ADXL345 not responding — check the CS wire on PE2\r\n");
         delay_ms(1000);
     }
 
@@ -78,34 +77,34 @@ static void adxl345_bringup(void) {
 }
 
 static void sdcard_bringup(void) {
-    printf("Initializing SD card...\r\n");
+    uart2_printf("Initializing SD card...\r\n");
 
     int rc;
     while ((rc = sdcard_init()) != 0) {
-        printf("sdcard_init failed (%d) — retrying\r\n", rc);
+        uart2_printf("sdcard_init failed (%d) — retrying\r\n", rc);
         delay_ms(1000);
     }
-    printf("SD card: %s\r\n", sdcard_type_name());
+    uart2_printf("SD card: %s\r\n", sdcard_type_name());
 
     /* Block 0's 0x55AA signature is the DEVID trick again — a fixed constant
      * known in advance, so a successful read proves itself. */
     static uint8_t block[SD_BLOCK_SIZE];
     rc = sdcard_read_block(0, block);
     if (rc != 0) {
-        printf("ERROR: block 0 read failed (%d)\r\n", rc);
+        uart2_printf("ERROR: block 0 read failed (%d)\r\n", rc);
         while (1);
     }
 
-    printf("block 0 signature: 0x%02X%02X (expect 0x55AA)\r\n", block[510], block[511]);
+    uart2_printf("block 0 signature: 0x%02X%02X (expect 0x55AA)\r\n", block[510], block[511]);
     if (block[510] != 0x55 || block[511] != 0xAA) {
-        printf("No boot signature — card may be unformatted, but the read path worked\r\n");
+        uart2_printf("No boot signature — card may be unformatted, but the read path worked\r\n");
     }
 
     /* The card is on its own bus now, so this should be unconditionally true —
      * which is exactly why it is worth asserting once. */
-    printf("post-SD ");
+    uart2_printf("post-SD ");
     if (!adxl345_devid_ok()) {
-        printf("ADXL345 lost after SD init — the two buses are interfering\r\n");
+        uart2_printf("ADXL345 lost after SD init — the two buses are interfering\r\n");
         while (1);
     }
 }
@@ -118,16 +117,16 @@ int main(void) {
     spi2_init();   /* SPI2: SD card, private bus */
     uart_cmd_init();
 
-    printf("\r\n");   /* separate the boot banner from any reset noise */
+    uart2_printf("\r\n");   /* separate the boot banner from any reset noise */
 
     if (rtc_init() == RTC_SRC_NONE) {
-        printf("WARN: no RTC clock source started — timestamps will be wrong\r\n");
+        uart2_printf("WARN: no RTC clock source started — timestamps will be wrong\r\n");
     }
     rtc_time_t now;
     rtc_now(&now);
-    printf("RTC: %s%s\r\n", rtc_source_name(),
+    uart2_printf("RTC: %s%s\r\n", rtc_source_name(),
            rtc_was_running() ? " (kept running through reset)" : " (seeded from build time)");
-    printf("time: %04u-%02u-%02u %02u:%02u:%02u\r\n",
+    uart2_printf("time: %04u-%02u-%02u %02u:%02u:%02u\r\n",
            now.year, now.month, now.day, now.hour, now.min, now.sec);
 
     bmp280_calib_t calib;
@@ -137,10 +136,10 @@ int main(void) {
 
     int rc;
     while ((rc = datalog_open()) != 0) {
-        printf("datalog_open failed (%d) — card must be FAT32; retrying\r\n", rc);
+        uart2_printf("datalog_open failed (%d) — card must be FAT32; retrying\r\n", rc);
         delay_ms(1000);
     }
-    printf("logging to %s\r\n", datalog_filename());
+    uart2_printf("logging to %s\r\n", datalog_filename());
 
     /* Held between barometer ticks so the UART line always carries a full
      * record. The CSV deliberately does not hold — see datalog.c. */
@@ -182,7 +181,7 @@ int main(void) {
             switch (cmd.id) {
             case UART_CMD_RATE:
                 if (cmd.arg < RATE_HZ_MIN || cmd.arg > RATE_HZ_MAX) {
-                    printf("rate must be %d-%d Hz\r\n", RATE_HZ_MIN, RATE_HZ_MAX);
+                    uart2_printf("rate must be %d-%d Hz\r\n", RATE_HZ_MIN, RATE_HZ_MAX);
                 } else {
                     rate_hz      = (uint32_t)cmd.arg;
                     tick_ms      = 1000 / rate_hz;
@@ -192,27 +191,27 @@ int main(void) {
                      * computed under a different period and carries no useful
                      * meaning under the new one. */
                     next_sample = systick_millis() + tick_ms;
-                    printf("rate set to %lu Hz (tick %lu ms)\r\n",
+                    uart2_printf("rate set to %lu Hz (tick %lu ms)\r\n",
                            (unsigned long)rate_hz, (unsigned long)tick_ms);
                 }
                 break;
             case UART_CMD_START:
                 logging_enabled = 1;
-                printf("logging resumed -> %s\r\n", datalog_filename());
+                uart2_printf("logging resumed -> %s\r\n", datalog_filename());
                 break;
             case UART_CMD_STOP:
                 logging_enabled = 0;
-                printf("logging paused (sensors keep running)\r\n");
+                uart2_printf("logging paused (sensors keep running)\r\n");
                 break;
             case UART_CMD_STATUS: {
                 rtc_time_t st;
                 rtc_now(&st);
-                printf("state: %s\r\n", logging_enabled ? "running" : "stopped");
-                printf("rate: %lu Hz (tick %lu ms)\r\n",
+                uart2_printf("state: %s\r\n", logging_enabled ? "running" : "stopped");
+                uart2_printf("rate: %lu Hz (tick %lu ms)\r\n",
                        (unsigned long)rate_hz, (unsigned long)tick_ms);
-                printf("file: %s\r\n", datalog_filename());
-                printf("overruns: %lu\r\n", (unsigned long)overruns);
-                printf("time: %04u-%02u-%02u %02u:%02u:%02u\r\n",
+                uart2_printf("file: %s\r\n", datalog_filename());
+                uart2_printf("overruns: %lu\r\n", (unsigned long)overruns);
+                uart2_printf("time: %04u-%02u-%02u %02u:%02u:%02u\r\n",
                        st.year, st.month, st.day, st.hour, st.min, st.sec);
                 break;
             }
@@ -238,7 +237,7 @@ int main(void) {
                 env_valid = 1;
                 env_fresh = 1;
             } else {
-                printf("WARN: BMP280 measurement failed\r\n");
+                uart2_printf("WARN: BMP280 measurement failed\r\n");
             }
         }
         tick++;
@@ -250,14 +249,14 @@ int main(void) {
                 .x = x, .y = y, .z = z,
             };
             int wrc = datalog_write_row(&row);
-            if (wrc != 0) printf("WARN: datalog_write_row failed (%d)\r\n", wrc);
+            if (wrc != 0) uart2_printf("WARN: datalog_write_row failed (%d)\r\n", wrc);
 
             /* ±2g full-res → 256 LSB/g. Integer milli-g, no float path. */
             int xm = (x * 1000) / 256;
             int ym = (y * 1000) / 256;
             int zm = (z * 1000) / 256;
 
-            printf("[%lu.%03lu] ",
+            uart2_printf("[%lu.%03lu] ",
                    (unsigned long)(t_ms / 1000), (unsigned long)(t_ms % 1000));
 
             if (env_valid) {
@@ -269,16 +268,16 @@ int main(void) {
 
                 uint32_t pa = press_q24_8 >> 8;  // Q24.8 -> whole Pa
 
-                printf("T=%s%ld.%02ld C  P=%lu.%02lu hPa  ",
+                uart2_printf("T=%s%ld.%02ld C  P=%lu.%02lu hPa  ",
                        sign, (long)(t / 100), (long)(t % 100),
                        (unsigned long)(pa / 100), (unsigned long)(pa % 100));
             } else {
-                printf("T=  --.-- C  P= ---.-- hPa  ");
+                uart2_printf("T=  --.-- C  P= ---.-- hPa  ");
             }
 
-            printf("X:%5d Y:%5d Z:%5d mg", xm, ym, zm);
-            if (overruns) printf("  [overruns:%lu]", (unsigned long)overruns);
-            printf("\r\n");
+            uart2_printf("X:%5d Y:%5d Z:%5d mg", xm, ym, zm);
+            if (overruns) uart2_printf("  [overruns:%lu]", (unsigned long)overruns);
+            uart2_printf("\r\n");
         }
     }
 }

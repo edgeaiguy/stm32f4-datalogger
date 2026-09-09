@@ -24,7 +24,6 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <stdio.h>
 #include <signal.h>
 #include <time.h>
 #include <sys/time.h>
@@ -32,10 +31,6 @@
 
 
 /* Variables */
-extern int __io_putchar(int ch) __attribute__((weak));
-extern int __io_getchar(void) __attribute__((weak));
-
-
 char *__env[1] = { 0 };
 char **environ = __env;
 
@@ -64,29 +59,27 @@ void _exit (int status)
   while (1) {}    /* Make sure we hang here */
 }
 
-__attribute__((weak)) int _read(int file, char *ptr, int len)
+/* newlib's stdio stream init links these unconditionally to wire up
+ * stdin/stdout/stderr, regardless of whether the program ever calls printf -
+ * without a definition here the linker falls back to its own always-fail
+ * stub and warns about it. This firmware does not use stdio (see uart2.c /
+ * fmt.c), so these just fail cleanly; they are not an I/O retargeting path. */
+int _read(int file, char *ptr, int len)
 {
   (void)file;
-  int DataIdx;
-
-  for (DataIdx = 0; DataIdx < len; DataIdx++)
-  {
-    *ptr++ = __io_getchar();
-  }
-
-  return len;
+  (void)ptr;
+  (void)len;
+  errno = ENOSYS;
+  return -1;
 }
 
-__attribute__((weak)) int _write(int file, char *ptr, int len)
+int _write(int file, char *ptr, int len)
 {
   (void)file;
-  int DataIdx;
-
-  for (DataIdx = 0; DataIdx < len; DataIdx++)
-  {
-    __io_putchar(*ptr++);
-  }
-  return len;
+  (void)ptr;
+  (void)len;
+  errno = ENOSYS;
+  return -1;
 }
 
 int _close(int file)

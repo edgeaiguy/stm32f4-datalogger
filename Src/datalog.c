@@ -1,7 +1,7 @@
 /* datalog.c — CSV logging of the fused sensor stream onto the SD card. */
-#include <stdio.h>
 #include "ff.h"
 #include "rtc.h"
+#include "fmt.h"
 #include "datalog.h"
 
 /* FatFs buffers writes, so nothing is safely on the card until f_sync(). Every
@@ -32,11 +32,11 @@ static int format_row(char *out, size_t cap, const datalog_row_t *r) {
         int32_t t = r->temp_c100;
         const char *sign = (t < 0) ? "-" : "";
         if (t < 0) t = -t;
-        snprintf(tbuf, sizeof tbuf, "%s%ld.%02ld",
+        fmt_snprintf(tbuf, sizeof tbuf, "%s%ld.%02ld",
                  sign, (long)(t / 100), (long)(t % 100));
 
         uint32_t pa = r->press_q24_8 >> 8;   /* Q24.8 -> whole Pa */
-        snprintf(pbuf, sizeof pbuf, "%lu.%02lu",
+        fmt_snprintf(pbuf, sizeof pbuf, "%lu.%02lu",
                  (unsigned long)(pa / 100), (unsigned long)(pa % 100));
     }
 
@@ -51,7 +51,7 @@ static int format_row(char *out, size_t cap, const datalog_row_t *r) {
     rtc_time_t w;
     rtc_now(&w);
 
-    return snprintf(out, cap,
+    return fmt_snprintf(out, cap,
                     "%04u-%02u-%02uT%02u:%02u:%02u.%03u,%lu,%s,%s,%d,%d,%d\r\n",
                     w.year, w.month, w.day, w.hour, w.min, w.sec, w.ms,
                     (unsigned long)r->t_ms, tbuf, pbuf, xm, ym, zm);
@@ -65,7 +65,7 @@ int datalog_open(void) {
      * previous session. 8.3 names, so LOGnnnnn.CSV is the whole budget. */
     FILINFO info;
     for (unsigned n = 1; n <= 99999; n++) {
-        snprintf(fname, sizeof fname, "LOG%05u.CSV", n);
+        fmt_snprintf(fname, sizeof fname, "LOG%05u.CSV", n);
 
         FRESULT st = f_stat(fname, &info);
         if (st == FR_OK) continue;              /* name taken, try the next */

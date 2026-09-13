@@ -36,7 +36,7 @@ Wiring diagram: `docs/wiring.png` · BOM: `docs/bom.md`
 
 ## Architecture
 
-![architecture](docs/architecture.png)
+![architecture](docs/figure-01-architecture-logger.svg)
 
 **Three buses, deliberately.** The topology is the point of this project. I2C1
 carries the BMP280 alone. SPI1 is a genuinely shared bus — the ADXL345 breakout
@@ -204,6 +204,9 @@ name so a reset never clobbers the previous session. Columns:
 | after  | 35840 | 1360 | 4144 | 37200 B |
 | **saved** | | | | **29512 B (~28.8 KiB, 44%)** |
 
+### Logic Analyzer Captures
+![spi1-devid-read](docs/figure-02-spi1-devid-read.png)
+![spi1-all-five-devid-reads](docs/figure-03-ADXL-DEVID-5.png)
 - Captures: `docs/*-capture.png` (annotated)
 - Proof it ran: `docs/setup.jpg`, `docs/serial-output.png`
 

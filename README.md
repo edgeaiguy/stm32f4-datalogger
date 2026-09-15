@@ -32,8 +32,6 @@ bus drivers up is written directly against the reference manual.
 | microSD breakout | SPI2 — PB13 SCK / PB14 MISO / PB15 MOSI (AF5) | CS on **PE4**, 250 kHz init → 4 MHz data |
 | USART2 → ST-LINK VCP | PA2 TX / PA3 RX (AF7) | 115200 8N1, console + command line |
 
-Wiring diagram: `docs/wiring.png` · BOM: `docs/bom.md`
-
 ## Architecture
 
 ![architecture](docs/figure-01-architecture-logger.svg)
@@ -210,8 +208,7 @@ name so a reset never clobbers the previous session. Columns:
 - Captures: `docs/*-capture.png` (annotated)
 - Proof it ran: `docs/setup.jpg`, `docs/serial-output.png`
 
-> **Assets pending:** `docs/` is not yet populated. Outstanding —
-> `architecture.png`, `wiring.png`, `bom.md`, logic analyzer captures for the
+> **Assets pending:** `docs/` is not yet populated. Outstanding —  logic analyzer captures for the
 > three buses, `setup.jpg`, `serial-output.png`.
 
 ## Known limitations

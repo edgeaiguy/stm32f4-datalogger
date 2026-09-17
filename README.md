@@ -205,11 +205,13 @@ name so a reset never clobbers the previous session. Columns:
 ### Logic Analyzer Captures
 ![spi1-devid-read](docs/figure-02-spi1-devid-read.png)
 ![spi1-all-five-devid-reads](docs/figure-03-ADXL-DEVID-5.png)
-- Captures: `docs/*-capture.png` (annotated)
-- Proof it ran: `docs/setup.jpg`, `docs/serial-output.png`
-
-> **Assets pending:** `docs/` is not yet populated. Outstanding —  logic analyzer captures for the
-> three buses, `setup.jpg`, `serial-output.png`.
+![i2c1-bmp280](docs/figure-03-i2c-bmp280-chip-id.png)
+![spi2-sd-card-wake-up](docs/figure-04-spi2-sd-card-wake-up.png)
+![spi2-sd-clock-rate](docs/figure-05-spi2-sd-clock-rate.png)
+TODO: add spi2-xxx here
+Bus timing: the clock rate isn't the throughput. The SPI2 clock reaches 4.17 MHz in the data phase (240 ns/period, measured edge-to-edge within a single byte burst), confirming the post-init clock bump from the ~250 kHz initialization rate. But the raw clock rate is not the transfer rate. Each byte occupies an 11.04 µs cycle — only ~1.9 µs of which is actual clocking (8 edges × 240 ns); the remaining ~9 µs is software overhead between spi_transfer() calls in the polled loop. Effective throughput is therefore ~90 KB/s, roughly one-fifth of what the 4 MHz clock could sustain back-to-back. This gap is the measured cost of a blocking, byte-at-a-time transfer path, and it is the concrete motivation for the DMA-driven, RTOS-scheduled I/O in the next project: the clock is already fast: what's missing is keeping it fed.
+![serial-output](docs/serial-output.png)
+![setup](docs/setup.png)
 
 ## Known limitations
 

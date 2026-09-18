@@ -202,16 +202,35 @@ name so a reset never clobbers the previous session. Columns:
 | after  | 35840 | 1360 | 4144 | 37200 B |
 | **saved** | | | | **29512 B (~28.8 KiB, 44%)** |
 
-### Logic Analyzer Captures
+### Logic analyzer captures
+
 ![spi1-devid-read](docs/figure-02-spi1-devid-read.png)
+*SPI1 — single ADXL345 DEVID read (0xE5)*
+
 ![spi1-all-five-devid-reads](docs/figure-03-ADXL-DEVID-5.png)
+*SPI1 — five DEVID reads back-to-back, the bring-up contended-bus check*
+
 ![i2c1-bmp280](docs/figure-03-i2c-bmp280-chip-id.png)
+*I2C1 — BMP280 chip ID read (0x58)*
+
 ![spi2-sd-card-wake-up](docs/figure-04-spi2-sd-card-wake-up.png)
+*SPI2 — SD card's 74 wake-up clocks, CS deselected*
+
 ![spi2-sd-clock-rate](docs/figure-05-spi2-sd-clock-rate.png)
-TODO: add spi2-xxx here
+*SPI2 — data-phase clock at 4.17 MHz*
+
+![spi-2-transfer-overhead](docs/figure-06-spi2-transfer-overhead.png)
+*SPI2 — per-byte overhead behind the polled transfer loop*
+
 Bus timing: the clock rate isn't the throughput. The SPI2 clock reaches 4.17 MHz in the data phase (240 ns/period, measured edge-to-edge within a single byte burst), confirming the post-init clock bump from the ~250 kHz initialization rate. But the raw clock rate is not the transfer rate. Each byte occupies an 11.04 µs cycle — only ~1.9 µs of which is actual clocking (8 edges × 240 ns); the remaining ~9 µs is software overhead between spi_transfer() calls in the polled loop. Effective throughput is therefore ~90 KB/s, roughly one-fifth of what the 4 MHz clock could sustain back-to-back. This gap is the measured cost of a blocking, byte-at-a-time transfer path, and it is the concrete motivation for the DMA-driven, RTOS-scheduled I/O in the next project: the clock is already fast: what's missing is keeping it fed.
+
+### Serial output and setup
+
 ![serial-output](docs/serial-output.png)
+*Boot sequence, live sample stream, and the `stop`/`status`/`start` command flow*
+
 ![setup](docs/setup.png)
+*Discovery board and breadboard sensor wiring, captured with a Kingst LA1010 logic analyzer*
 
 ## Known limitations
 
